@@ -9,3 +9,4 @@ config/locomotive.yml
 .loadpath
 .project
 .tmp*~
+/pkg
