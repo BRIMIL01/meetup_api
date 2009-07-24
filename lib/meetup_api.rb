@@ -7,6 +7,11 @@ module MeetupApi
   API_BASE_URL = "http://api#{DEV}.meetup.com/"
   EVENTS_URI = 'events'
   RSVPS_URI = 'rsvps'
+  MEMBERS_URI = 'members'
+  GROUPS_URI = 'groups'
+  PHOTOS_URI = 'photos'
+  TOPICS_URI = 'topics'
+  COMMENTS_URI = 'comments'
   
   class Client
     def initialize(apiKey)
@@ -19,6 +24,26 @@ module MeetupApi
 
     def get_rsvps(args)
       ApiResponse.new(fetch(RSVPS_URI, args), Rsvp)
+    end
+    
+    def get_members(args)
+      ApiResponse.new(fetch(MEMBERS_URI, args), Member)
+    end
+    
+    def get_groups(args)
+      ApiResponse.new(fetch(GROUPS_URI, args), Group)
+    end
+    
+    def get_photos(args)
+      ApiResponse.new(fetch(PHOTOS_URI, args), Photo)
+    end
+    
+    def get_topics(args)
+      ApiResponse.new(fetch(TOPICS_URI, args), Photo)
+    end
+    
+    def get_comments(args)
+      ApiResponse.new(fetch(COMMENTS_URI, args), Comment)
     end
 
     def fetch(uri, url_args={})
@@ -82,6 +107,56 @@ module MeetupApi
   class Rsvp < ApiItem
     def to_s
       "Rsvp by #{self.name} (#{self.link}) with comment: #{self.comment}"
+    end
+  end
+  
+  class Group < ApiItem
+    def get_members(apiclient, extraparams={})
+      extraparams['group_id'] = self.id
+      apiclient.get_members extraparams
+    end
+    
+    def get_photos(apiclient, extraparams={})
+      extraparams['group_id'] = self.id
+      apiclient.get_photos extraparams
+    end
+    
+    def get_comments(apiclient, extraparams={})
+      extraparams['group_id'] = self.id
+      apiclient.get_comments extraparams
+    end
+    
+    def to_s
+      "Group #{self.id} named #{self.name}"
+    end
+  end
+  
+  class Member < ApiItem  
+    def to_s
+      "Member #{self.id} named #{self.name}"
+    end
+  end
+  
+  class Photo < ApiItem
+    def to_s
+      "Photo #{self.id} named #{self.name}"
+    end
+  end
+  
+  class Topic < ApiItem
+    def get_photos(apiclient, extraparams={})
+      extraparams['topic_id'] = self.id
+      apiclient.get_photos extraparams
+    end
+    
+    def to_s
+      "Topic #{self.id} named #{self.name}"
+    end
+  end
+  
+  class Comment < ApiItem
+    def to_s
+      "Comment #{self.id} named #{self.name}"
     end
   end
   
