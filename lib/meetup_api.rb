@@ -14,41 +14,43 @@ module MeetupApi
   COMMENTS_URI = 'comments'
   
   class Client
-    def initialize(apiKey)
-      @key = apiKey
+    attr_reader :config
+    def initialize(config)
+      @config = config
     end
     
     def get_events(args)
-      ApiResponse.new(fetch(EVENTS_URI, args), Event)
+      args['after'] ||= '01012000'
+      ApiResponse.new(fetch(EVENTS_URI, args), Event, self)
     end
 
     def get_rsvps(args)
-      ApiResponse.new(fetch(RSVPS_URI, args), Rsvp)
+      ApiResponse.new(fetch(RSVPS_URI, args), Rsvp, self)
     end
     
     def get_members(args)
-      ApiResponse.new(fetch(MEMBERS_URI, args), Member)
+      ApiResponse.new(fetch(MEMBERS_URI, args), Member, self)
     end
     
     def get_groups(args)
-      ApiResponse.new(fetch(GROUPS_URI, args), Group)
+      ApiResponse.new(fetch(GROUPS_URI, args), Group, self)
     end
     
     def get_photos(args)
-      ApiResponse.new(fetch(PHOTOS_URI, args), Photo)
+      ApiResponse.new(fetch(PHOTOS_URI, args), Photo, self)
     end
     
     def get_topics(args)
-      ApiResponse.new(fetch(TOPICS_URI, args), Photo)
+      ApiResponse.new(fetch(TOPICS_URI, args), Topic, self)
     end
     
     def get_comments(args)
-      ApiResponse.new(fetch(COMMENTS_URI, args), Comment)
+      ApiResponse.new(fetch(COMMENTS_URI, args), Comment, self)
     end
 
     def fetch(uri, url_args={})
       url_args['format'] = 'json'
-      url_args['key'] = @key if @key
+      url_args['key'] = @config[:key] if @config[:key]
       args = URI.escape(url_args.collect{|k,v| "#{k}=#{v}"}.join('&'))
       url = "#{API_BASE_URL}#{uri}/?#{args}"
       data = Net::HTTP.get_response(URI.parse(url)).body
@@ -63,21 +65,37 @@ module MeetupApi
   end
 
   class ApiResponse
+    include Enumerable
     attr_reader :meta, :results
 
-    def initialize(json, klass)
+    def initialize(json, klass, api)
       if (meta_data = json['meta'])
         @meta = meta_data
-        @results = json['results'].collect {|hash| klass.new hash}
+        @results = json['results'].collect {|hash| klass.new(hash, api)}
+        
       else
         raise ClientException.new(json)
       end
+    end
+    
+    def [](i)
+      @results[i]
+    end
+    
+    def each
+      @results.each { |item| yield item }
+    end
+    
+    def count
+      @results.count
     end
   end
   
   # Turns a hash into an object - see http://tinyurl.com/97dtjj
   class Hashit
-    def initialize(hash)
+    def initialize(hash, client)
+      # Pass the client into the ApiItem so scoped calls can be made ex: events.rsvps
+      @client = client
       hash.each do |k,v|
         # create and initialize an instance variable for this key/value pair
         self.instance_variable_set("@#{k}", v)
@@ -94,9 +112,9 @@ module MeetupApi
   end
   
   class Event < ApiItem
-    def get_rsvps(apiclient, extraparams={})
+    def rsvps(extraparams={})
       extraparams['event_id'] = self.id
-      apiclient.get_rsvps extraparams
+      @client.get_rsvps extraparams
     end
     
     def to_s
@@ -111,19 +129,24 @@ module MeetupApi
   end
   
   class Group < ApiItem
-    def get_members(apiclient, extraparams={})
+    def group_members(extraparams={})
       extraparams['group_id'] = self.id
-      apiclient.get_members extraparams
+      @client.get_members extraparams
     end
     
-    def get_photos(apiclient, extraparams={})
+    def photos(extraparams={})
       extraparams['group_id'] = self.id
-      apiclient.get_photos extraparams
+      @client.get_photos extraparams
     end
     
-    def get_comments(apiclient, extraparams={})
+    def comments(extraparams={})
       extraparams['group_id'] = self.id
-      apiclient.get_comments extraparams
+      @client.get_comments extraparams
+    end
+    
+    def events(extraparams={})
+      extraparams['group_id'] = self.id
+      @client.get_events extraparams
     end
     
     def to_s
@@ -144,9 +167,9 @@ module MeetupApi
   end
   
   class Topic < ApiItem
-    def get_photos(apiclient, extraparams={})
+    def photos(extraparams={})
       extraparams['topic_id'] = self.id
-      apiclient.get_photos extraparams
+      @client.get_photos extraparams
     end
     
     def to_s
